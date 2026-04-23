@@ -106,8 +106,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const pairs = await extractVocabularyFromImages(images);
-    return NextResponse.json({ pairs }, { status: 200 });
+    const result = await extractVocabularyFromImages(images);
+    return NextResponse.json(result, { status: 200 });
   } catch (err) {
     console.error("extract route failed:", err);
     const message =

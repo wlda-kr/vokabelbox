@@ -29,12 +29,14 @@ export default function TestOcrPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [pairs, setPairs] = useState<VocabPair[] | null>(null);
+  const [suggestedName, setSuggestedName] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   async function handleExtract() {
     setLoading(true);
     setError(null);
     setPairs(null);
+    setSuggestedName("");
 
     try {
       const images = await Promise.all(files.map(fileToBase64));
@@ -44,7 +46,12 @@ export default function TestOcrPage() {
         body: JSON.stringify({ images }),
       });
 
-      let payload: { pairs?: VocabPair[]; error?: string; message?: string };
+      let payload: {
+        suggestedName?: string;
+        pairs?: VocabPair[];
+        error?: string;
+        message?: string;
+      };
       try {
         payload = await res.json();
       } catch {
@@ -57,6 +64,7 @@ export default function TestOcrPage() {
         );
       }
 
+      setSuggestedName(payload.suggestedName ?? "");
       setPairs(payload.pairs ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -129,6 +137,12 @@ export default function TestOcrPage() {
 
       {pairs && (
         <section className="space-y-3">
+          {suggestedName && (
+            <p className="text-sm text-gray-700">
+              Vorgeschlagener Name:{" "}
+              <span className="font-medium">{suggestedName}</span>
+            </p>
+          )}
           <p className="text-sm font-medium">
             {pairs.length} Vokabeln gefunden
           </p>

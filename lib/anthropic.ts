@@ -7,6 +7,11 @@ export type VocabPair = {
   target: string;
 };
 
+export type ExtractionResult = {
+  suggestedName: string;
+  pairs: VocabPair[];
+};
+
 type ImageInput = {
   data: string;
   mediaType: "image/jpeg" | "image/png" | "image/webp";
@@ -23,12 +28,14 @@ Extrahiere ALLE Vokabelpaare von der/den Seiten. Regeln:
 - Reihenfolge wie im Buch beibehalten
 - Bei mehreren Fotos: alle Seiten zusammenfassen, keine Duplikate
 
+Schlage außerdem einen kurzen, prägnanten Lektionsnamen auf Deutsch vor, basierend auf der Buchseite. Format z.B. 'Unidad 6 - Kleidung' oder 'Lektion 3 - Im Restaurant'. Schau nach Kapitelnummern und Überschriften auf dem Foto.
+
 Antworte AUSSCHLIESSLICH mit gültigem JSON, ohne Markdown-Codeblöcke, ohne Erklärung, in diesem Format:
-{"pairs": [{"source": "la casa", "target": "das Haus"}, ...]}`;
+{"suggestedName": "...", "pairs": [{"source": "la casa", "target": "das Haus"}, ...]}`;
 
 export async function extractVocabularyFromImages(
   images: ImageInput[],
-): Promise<VocabPair[]> {
+): Promise<ExtractionResult> {
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 4000,
@@ -81,5 +88,12 @@ export async function extractVocabularyFromImages(
     );
   }
 
-  return (parsed as { pairs: VocabPair[] }).pairs;
+  const obj = parsed as { suggestedName?: unknown; pairs: VocabPair[] };
+  const suggestedName =
+    typeof obj.suggestedName === "string" ? obj.suggestedName : "";
+
+  return {
+    suggestedName,
+    pairs: obj.pairs,
+  };
 }
