@@ -98,7 +98,6 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
   const [result, setResult] = useState<CurrentResult | null>(null);
   const [results, setResults] = useState<AnswerLog[]>([]);
   const [done, setDone] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const attemptSavedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -148,13 +147,12 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
   const wrongLogs = results.filter((r) => r.result === "wrong");
   const wrongCount = wrongLogs.length;
 
-  async function handleSubmit(event?: React.FormEvent) {
+  function handleSubmit(event?: React.FormEvent) {
     event?.preventDefault();
-    if (submitting || result) return;
+    if (result) return;
     const trimmed = answer.trim();
     if (!trimmed) return;
 
-    setSubmitting(true);
     const kind = checkAnswer(trimmed, expected);
     const log: AnswerLog = {
       vocab_id: current.vocab.id,
@@ -167,14 +165,13 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
     setResult({ kind, expected, userAnswer: trimmed });
     setResults((prev) => [...prev, log]);
 
-    const res = await recordQuizAnswer(current.vocab.id, kind);
-    if ("error" in res) {
-      console.error("recordQuizAnswer failed", res.error);
-    }
-    setSubmitting(false);
+    // Fire-and-forget: Leitner-Update blockiert die UI nicht.
+    recordQuizAnswer(current.vocab.id, kind).catch((err) => {
+      console.error("recordQuizAnswer failed", err);
+    });
   }
 
-  async function handleContinue() {
+  function handleContinue() {
     if (!result) return;
     const nextIndex = currentIndex + 1;
 
@@ -187,7 +184,7 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
         ).length;
         const percent = total > 0 ? (finalCorrect / total) * 100 : 0;
         const grade = mode === "test" ? calculateGrade(percent).grade : null;
-        const saveResult = await recordAttempt({
+        recordAttempt({
           lessonId: lesson.id,
           mode,
           total,
@@ -198,10 +195,15 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
             result: r.result,
             direction: r.direction,
           })),
-        });
-        if ("error" in saveResult) {
-          setSaveError(saveResult.error);
-        }
+        })
+          .then((saveResult) => {
+            if ("error" in saveResult) setSaveError(saveResult.error);
+          })
+          .catch((err) => {
+            setSaveError(
+              err instanceof Error ? err.message : "Speichern fehlgeschlagen.",
+            );
+          });
       }
       return;
     }
@@ -294,7 +296,7 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
               spellCheck={false}
               inputMode="text"
               lang={answerLang}
-              disabled={!!result || submitting}
+              disabled={!!result}
               className="input-bold disabled:bg-cream disabled:text-ink-soft"
             />
           </div>
@@ -304,10 +306,10 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
           ) : (
             <button
               type="submit"
-              disabled={submitting || !answer.trim()}
+              disabled={!answer.trim()}
               className="btn-primary w-full"
             >
-              {submitting ? "Prüfe…" : "Prüfen"}
+              Prüfen
             </button>
           )}
 

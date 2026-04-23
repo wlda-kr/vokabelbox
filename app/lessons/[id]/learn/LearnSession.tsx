@@ -43,7 +43,6 @@ export function LearnSession({
   const [flipped, setFlipped] = useState(false);
   const [results, setResults] = useState({ known: 0, unknown: 0 });
   const [done, setDone] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,20 +73,12 @@ export function LearnSession({
     setError(null);
   }
 
-  async function handleAnswer(known: boolean) {
-    if (submitting || done) return;
+  function handleAnswer(known: boolean) {
+    if (done) return;
     const item = queue[currentIndex];
     if (!item) return;
 
-    setSubmitting(true);
-    const res = await updateVocabularyReview(item.id, known);
-    setSubmitting(false);
-
-    if ("error" in res) {
-      setError(res.error);
-      // Fortschritt nicht blockieren.
-    }
-
+    // Optimistic: UI sofort weiterschalten, Server-Action im Hintergrund.
     setResults((prev) => ({
       known: prev.known + (known ? 1 : 0),
       unknown: prev.unknown + (known ? 0 : 1),
@@ -100,6 +91,14 @@ export function LearnSession({
     } else {
       setCurrentIndex(nextIndex);
     }
+
+    updateVocabularyReview(item.id, known)
+      .then((res) => {
+        if ("error" in res) setError(res.error);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Update fehlgeschlagen.");
+      });
   }
 
   const total = queue.length;
@@ -167,7 +166,6 @@ export function LearnSession({
               <button
                 type="button"
                 onClick={() => handleAnswer(false)}
-                disabled={submitting}
                 className="btn-primary"
               >
                 <RotateCcw size={16} aria-hidden />
@@ -176,7 +174,6 @@ export function LearnSession({
               <button
                 type="button"
                 onClick={() => handleAnswer(true)}
-                disabled={submitting}
                 className="btn-secondary"
               >
                 <Check size={16} aria-hidden />

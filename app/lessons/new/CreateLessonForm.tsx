@@ -13,9 +13,47 @@ type EditablePair = {
   target: string;
 };
 
-async function fileToBase64(
-  file: File,
-): Promise<{ data: string; mediaType: string }> {
+const MAX_DIMENSION = 1600;
+const JPEG_QUALITY = 0.85;
+
+async function downscaleImage(file: File, maxDim = MAX_DIMENSION): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () =>
+        reject(new Error("Bild konnte nicht geladen werden."));
+      image.src = url;
+    });
+
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas-Kontext nicht verfügbar.");
+    ctx.drawImage(img, 0, 0, w, h);
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Bild konnte nicht encodiert werden."));
+        },
+        "image/jpeg",
+        JPEG_QUALITY,
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error);
@@ -26,11 +64,18 @@ async function fileToBase64(
         return;
       }
       const comma = result.indexOf(",");
-      const data = comma >= 0 ? result.slice(comma + 1) : result;
-      resolve({ data, mediaType: file.type });
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+}
+
+async function fileToPayload(
+  file: File,
+): Promise<{ data: string; mediaType: string }> {
+  const blob = await downscaleImage(file);
+  const data = await blobToBase64(blob);
+  return { data, mediaType: "image/jpeg" };
 }
 
 export function CreateLessonForm() {
@@ -82,7 +127,7 @@ export function CreateLessonForm() {
     setPhase("loading");
 
     try {
-      const images = await Promise.all(files.map(fileToBase64));
+      const images = await Promise.all(files.map(fileToPayload));
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -333,7 +378,6 @@ export function CreateLessonForm() {
         type="file"
         accept="image/*"
         multiple
-        capture="environment"
         onChange={(event) => addFiles(Array.from(event.target.files ?? []))}
         className="hidden"
       />
