@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowLeft, Check, RotateCcw, Trophy } from "lucide-react";
 import { SpeakButton } from "@/components/SpeakButton";
 import {
   updateVocabularyReview,
@@ -46,7 +47,7 @@ export function LearnSession({ lessonId, vocabulary }: Props) {
   if (!mounted || queue.length === 0) {
     return (
       <main className="mx-auto w-full max-w-2xl p-6">
-        <p className="text-sm text-gray-600">Lade Lernkarten…</p>
+        <p className="text-sm text-ink-soft">Lade Lernkarten…</p>
       </main>
     );
   }
@@ -71,7 +72,7 @@ export function LearnSession({ lessonId, vocabulary }: Props) {
 
     if ("error" in res) {
       setError(res.error);
-      // Fortschritt nicht blockieren — trotzdem zur nächsten Karte.
+      // Fortschritt nicht blockieren.
     }
 
     setResults((prev) => ({
@@ -91,27 +92,29 @@ export function LearnSession({ lessonId, vocabulary }: Props) {
   const total = queue.length;
   const position = done ? total : currentIndex + 1;
   const progressPct = Math.round(((done ? total : currentIndex) / total) * 100);
+  const currentItem = queue[currentIndex];
 
   return (
     <main className="mx-auto w-full max-w-2xl p-6 space-y-6">
       <header className="flex items-center justify-between gap-3">
         <Link
           href={`/lessons/${lessonId}`}
-          className="text-sm text-gray-600 hover:text-gray-900"
+          className="btn-ghost text-sm -ml-3"
         >
-          ← Abbrechen
+          <ArrowLeft size={16} />
+          Abbrechen
         </Link>
-        <span className="text-sm text-gray-600 tabular-nums">
+        <span className="text-sm font-bold tabular-nums">
           {position} / {total}
         </span>
       </header>
 
       <div
-        className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+        className="h-4 w-full overflow-hidden rounded-full border-2 border-navy bg-paper"
         aria-label="Fortschritt"
       >
         <div
-          className="h-full rounded-full bg-gray-900 transition-all"
+          className="h-full bg-tomato transition-all duration-300"
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -119,38 +122,23 @@ export function LearnSession({ lessonId, vocabulary }: Props) {
       {error && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="rounded-lg border-2 border-tomato bg-tomato/10 px-3 py-2 text-sm font-medium text-tomato-dark"
         >
           {error}
         </div>
       )}
 
       {done ? (
-        <section className="space-y-6 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-          <h2 className="text-xl font-semibold">Super gemacht!</h2>
-          <p className="text-sm text-gray-700">
-            {results.known} gekannt · {results.unknown} nochmal üben
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              onClick={restart}
-              className="min-h-[44px] rounded-md bg-gray-900 px-5 py-2 text-base font-medium text-white"
-            >
-              Nochmal
-            </button>
-            <Link
-              href={`/lessons/${lessonId}`}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-300 px-5 py-2 text-base font-medium"
-            >
-              Zurück zur Lektion
-            </Link>
-          </div>
-        </section>
-      ) : (
+        <DoneCard
+          known={results.known}
+          unknown={results.unknown}
+          lessonId={lessonId}
+          onRestart={restart}
+        />
+      ) : currentItem ? (
         <>
-          <Card
-            item={queue[currentIndex]}
+          <FlipCard
+            item={currentItem}
             flipped={flipped}
             onFlip={() => setFlipped((prev) => !prev)}
           />
@@ -161,27 +149,29 @@ export function LearnSession({ lessonId, vocabulary }: Props) {
                 type="button"
                 onClick={() => handleAnswer(false)}
                 disabled={submitting}
-                className="min-h-[56px] rounded-xl bg-red-600 px-4 py-3 text-base font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                className="btn-primary"
               >
-                Nochmal üben
+                <RotateCcw size={16} aria-hidden />
+                Nochmal
               </button>
               <button
                 type="button"
                 onClick={() => handleAnswer(true)}
                 disabled={submitting}
-                className="min-h-[56px] rounded-xl bg-green-600 px-4 py-3 text-base font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                className="btn-secondary"
               >
+                <Check size={16} aria-hidden />
                 Kann ich
               </button>
             </div>
           )}
         </>
-      )}
+      ) : null}
     </main>
   );
 }
 
-function Card({
+function FlipCard({
   item,
   flipped,
   onFlip,
@@ -191,26 +181,97 @@ function Card({
   onFlip: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onFlip}
-      className="relative flex min-h-[220px] w-full flex-col items-center justify-center rounded-2xl border border-gray-300 bg-white p-6 text-center shadow-sm hover:shadow"
-    >
-      <p className="text-2xl font-semibold">
-        {flipped ? item.term_target : item.term_source}
-      </p>
-
-      {!flipped && (
-        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-gray-500">
-          Tippen zum Umdrehen
-        </p>
-      )}
-
-      {!flipped && (
-        <div className="absolute bottom-2 right-2">
-          <SpeakButton text={item.term_source} />
+    <div className="flip-card w-full">
+      <div
+        className={`flip-card-inner ${flipped ? "is-flipped" : ""}`}
+        onClick={onFlip}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onFlip();
+          }
+        }}
+      >
+        <div className="flip-card-face flip-card-front">
+          <div className="relative flex h-full min-h-[340px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-navy bg-paper p-6 text-center shadow-pop-lg">
+            <p className="font-display text-4xl md:text-5xl font-bold leading-tight text-navy">
+              {item.term_source}
+            </p>
+            <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-ink-soft">
+              Tippen zum Umdrehen
+            </p>
+            <div
+              className="absolute bottom-3 right-3"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <SpeakButton text={item.term_source} />
+            </div>
+          </div>
         </div>
-      )}
-    </button>
+        <div className="flip-card-face flip-card-back">
+          <div className="flex h-full min-h-[340px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-navy bg-navy p-6 text-center text-paper shadow-pop-lg">
+            <p className="font-display text-4xl md:text-5xl font-bold leading-tight">
+              {item.term_target}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DoneCard({
+  known,
+  unknown,
+  lessonId,
+  onRestart,
+}: {
+  known: number;
+  unknown: number;
+  lessonId: string;
+  onRestart: () => void;
+}) {
+  return (
+    <section className="card bg-sunshine text-center space-y-6 py-10">
+      <div className="flex justify-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-navy bg-paper shadow-pop">
+          <Trophy aria-hidden size={32} className="text-tomato" />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <h2 className="font-display text-4xl font-bold">¡Muy bien!</h2>
+        <p className="text-sm text-ink-soft">Alles durchgegangen.</p>
+      </div>
+      <div className="flex items-center justify-center gap-6">
+        <div className="space-y-1">
+          <p className="font-display text-4xl font-bold text-teal-dark">
+            {known}
+          </p>
+          <p className="text-xs font-bold uppercase tracking-wide text-ink-soft">
+            gekannt
+          </p>
+        </div>
+        <div className="h-10 w-px bg-navy/30" aria-hidden />
+        <div className="space-y-1">
+          <p className="font-display text-4xl font-bold text-tomato-dark">
+            {unknown}
+          </p>
+          <p className="text-xs font-bold uppercase tracking-wide text-ink-soft">
+            nochmal
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <button type="button" onClick={onRestart} className="btn-primary">
+          <RotateCcw size={16} aria-hidden />
+          Nochmal
+        </button>
+        <Link href={`/lessons/${lessonId}`} className="btn-ghost bg-paper">
+          Zurück zur Lektion
+        </Link>
+      </div>
+    </section>
   );
 }

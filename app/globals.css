@@ -1,26 +1,143 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Surfaces */
+  --color-cream: #fdf6e3;
+  --color-paper: #fffbf0;
+
+  /* Brand */
+  --color-tomato: #e04832;
+  --color-tomato-dark: #b83a27;
+  --color-teal: #1e9b8a;
+  --color-teal-dark: #137060;
+  --color-sunshine: #f4c542;
+  --color-coral: #ff7a59;
+
+  /* Ink */
+  --color-navy: #1a2a3a;
+  --color-ink-soft: #4a5568;
+
+  /* Leitner boxes */
+  --color-box-1: #e04832;
+  --color-box-2: #f4c542;
+  --color-box-3: #9ac558;
+  --color-box-4: #4a9b4f;
+  --color-box-5: #1e7a3a;
+
+  /* Fonts */
+  --font-display: var(--font-fraunces), "Fraunces", Georgia, "Times New Roman",
+    serif;
+  --font-body: var(--font-space-grotesk), "Space Grotesk", system-ui,
+    -apple-system, sans-serif;
+
+  /* Brutalist offset shadows */
+  --shadow-pop-sm: 2px 2px 0 #1a2a3a;
+  --shadow-pop: 4px 4px 0 #1a2a3a;
+  --shadow-pop-lg: 6px 6px 0 #1a2a3a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html,
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-navy);
+  }
+  body {
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 60;
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: var(--color-sunshine);
+    color: var(--color-navy);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .card {
+    @apply bg-paper border-2 border-navy rounded-xl shadow-pop p-5;
+  }
+
+  .card-flat {
+    @apply bg-paper border-2 border-navy rounded-xl p-5;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-tomato text-paper border-2 border-navy rounded-full
+           shadow-pop-sm px-6 py-3 font-bold text-base
+           transition-all duration-100
+           hover:shadow-pop hover:-translate-x-px hover:-translate-y-px
+           active:shadow-none active:translate-x-px active:translate-y-px
+           disabled:opacity-50 disabled:cursor-not-allowed
+           disabled:transform-none disabled:shadow-pop-sm;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-teal text-paper border-2 border-navy rounded-full
+           shadow-pop-sm px-6 py-3 font-bold text-base
+           transition-all duration-100
+           hover:shadow-pop hover:-translate-x-px hover:-translate-y-px
+           active:shadow-none active:translate-x-px active:translate-y-px
+           disabled:opacity-50 disabled:cursor-not-allowed
+           disabled:transform-none disabled:shadow-pop-sm;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           text-navy px-4 py-2 font-medium rounded-full
+           border-2 border-transparent
+           hover:bg-paper hover:border-navy
+           transition-all;
+  }
+
+  .input-bold {
+    @apply block w-full min-h-[44px] px-4 py-2
+           bg-paper border-2 border-navy rounded-lg
+           text-base font-body text-navy
+           placeholder:text-ink-soft/70
+           focus:outline-none focus:border-tomato
+           transition-colors;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1
+           text-xs font-bold border-2 border-navy;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full border-2 border-navy
+           bg-paper px-3 py-1 text-sm;
+  }
+
+  /* 3D flip card */
+  .flip-card {
+    perspective: 1400px;
+  }
+  .flip-card-inner {
+    position: relative;
+    width: 100%;
+    min-height: 340px;
+    transform-style: preserve-3d;
+    transition: transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .flip-card-inner.is-flipped {
+    transform: rotateY(180deg);
+  }
+  .flip-card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .flip-card-back {
+    transform: rotateY(180deg);
+  }
 }

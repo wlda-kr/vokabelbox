@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { deleteLesson } from "@/lib/actions/lessons";
 
 type Props = {
@@ -39,12 +40,13 @@ export function DeleteLessonButton({ lessonId, lessonName }: Props) {
         type="button"
         onClick={handleDelete}
         disabled={loading}
-        className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-tomato hover:text-tomato-dark disabled:opacity-50"
       >
+        <Trash2 aria-hidden size={14} />
         {loading ? "Lösche…" : "Lektion löschen"}
       </button>
       {error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-tomato-dark">
           {error}
         </p>
       )}

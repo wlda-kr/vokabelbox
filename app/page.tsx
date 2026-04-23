@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { listLessons } from "@/lib/actions/lessons";
@@ -11,6 +12,91 @@ function formatRelativeDate(iso: string): string {
   if (diffDays <= 0) return "heute erstellt";
   if (diffDays === 1) return "gestern erstellt";
   return `vor ${diffDays} Tagen erstellt`;
+}
+
+function EmptyState() {
+  return (
+    <div className="card bg-paper text-center space-y-5 py-10">
+      <svg
+        aria-hidden
+        viewBox="0 0 160 120"
+        className="mx-auto h-28 w-40"
+      >
+        <rect
+          x="18"
+          y="30"
+          width="96"
+          height="72"
+          rx="8"
+          fill="#fffbf0"
+          stroke="#1a2a3a"
+          strokeWidth="4"
+        />
+        <line
+          x1="34"
+          y1="52"
+          x2="98"
+          y2="52"
+          stroke="#1a2a3a"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <line
+          x1="34"
+          y1="66"
+          x2="86"
+          y2="66"
+          stroke="#1a2a3a"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <line
+          x1="34"
+          y1="80"
+          x2="92"
+          y2="80"
+          stroke="#1a2a3a"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <rect
+          x="92"
+          y="20"
+          width="56"
+          height="48"
+          rx="8"
+          fill="#e04832"
+          stroke="#1a2a3a"
+          strokeWidth="4"
+        />
+        <circle
+          cx="120"
+          cy="44"
+          r="12"
+          fill="#fdf6e3"
+          stroke="#1a2a3a"
+          strokeWidth="4"
+        />
+        <path
+          d="M 104 20 L 108 14 L 132 14 L 136 20"
+          fill="none"
+          stroke="#1a2a3a"
+          strokeWidth="4"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div className="space-y-2 px-4">
+        <p className="font-display text-2xl font-bold">Noch keine Lektion.</p>
+        <p className="text-sm text-ink-soft">
+          Mach ein Foto aus dem Buch, ich mache den Rest.
+        </p>
+      </div>
+      <Link href="/lessons/new" className="btn-primary">
+        <Plus size={18} />
+        Erste Lektion anlegen
+      </Link>
+    </div>
+  );
 }
 
 export default async function Home() {
@@ -26,45 +112,62 @@ export default async function Home() {
   const lessons = await listLessons();
 
   return (
-    <main className="mx-auto w-full max-w-2xl p-6 space-y-8">
-      <header className="flex items-center justify-between gap-4 border-b border-gray-200 pb-4">
-        <h1 className="text-2xl font-semibold">Vokabelbox</h1>
-        <div className="flex items-center gap-3 text-sm text-gray-600">
-          <span className="hidden sm:inline">
-            eingeloggt als {user.email}
+    <main className="mx-auto w-full max-w-3xl p-6 space-y-8">
+      <header className="flex items-start justify-between gap-4">
+        <h1 className="font-display text-4xl md:text-5xl font-bold -rotate-1 text-navy">
+          Vokabelbox
+        </h1>
+        <div className="flex flex-col items-end gap-1 text-sm">
+          <span className="hidden sm:inline text-ink-soft truncate max-w-[200px]">
+            {user.email}
           </span>
           <LogoutButton />
         </div>
       </header>
 
-      <Link
-        href="/lessons/new"
-        className="flex min-h-[56px] w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-300 px-4 py-3 text-base font-medium text-gray-700 hover:border-gray-400 hover:bg-gray-50"
-      >
-        + Neue Lektion
-      </Link>
+      {lessons.length > 0 && (
+        <Link
+          href="/lessons/new"
+          className="btn-primary w-full text-lg py-4"
+        >
+          <Plus size={20} />
+          Neue Lektion
+        </Link>
+      )}
 
       {lessons.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600">
-          Lege deine erste Lektion an.
-        </div>
+        <EmptyState />
       ) : (
-        <ul className="space-y-3">
-          {lessons.map((lesson) => (
-            <li key={lesson.id}>
-              <Link
-                href={`/lessons/${lesson.id}`}
-                className="block rounded-xl border border-gray-200 p-4 hover:border-gray-400 hover:bg-gray-50"
-              >
-                <p className="text-base font-medium">{lesson.name}</p>
-                <p className="mt-1 text-sm text-gray-600">
-                  {lesson.vocab_count}{" "}
-                  {lesson.vocab_count === 1 ? "Vokabel" : "Vokabeln"} ·{" "}
-                  {formatRelativeDate(lesson.created_at)}
-                </p>
-              </Link>
-            </li>
-          ))}
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {lessons.map((lesson, idx) => {
+            const badgeColor = idx % 2 === 0 ? "bg-coral" : "bg-sunshine";
+            const badgeText =
+              idx % 2 === 0 ? "text-paper" : "text-navy";
+            return (
+              <li key={lesson.id}>
+                <Link
+                  href={`/lessons/${lesson.id}`}
+                  className="card flex h-full flex-col gap-3 transition-all hover:shadow-pop-lg hover:-translate-x-0.5 hover:-translate-y-0.5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-display text-xl font-bold leading-tight">
+                      {lesson.name}
+                    </h2>
+                    <span
+                      className={`badge whitespace-nowrap ${badgeColor} ${badgeText}`}
+                    >
+                      {lesson.vocab_count}
+                    </span>
+                  </div>
+                  <p className="text-sm text-ink-soft mt-auto">
+                    {lesson.vocab_count === 1 ? "1 Vokabel" : `${lesson.vocab_count} Vokabeln`}
+                    {" · "}
+                    {formatRelativeDate(lesson.created_at)}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </main>

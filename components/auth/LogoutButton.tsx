@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export function LogoutButton() {
@@ -21,9 +22,10 @@ export function LogoutButton() {
       type="button"
       onClick={handleLogout}
       disabled={loading}
-      className="min-h-[44px] rounded-md border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50"
+      className="btn-ghost text-sm disabled:opacity-50"
     >
-      {loading ? "Abmelden…" : "Abmelden"}
+      <LogOut aria-hidden size={14} />
+      <span>{loading ? "…" : "Abmelden"}</span>
     </button>
   );
 }
