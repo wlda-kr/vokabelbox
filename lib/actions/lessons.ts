@@ -41,6 +41,26 @@ export type UpdateVocabResult = { box: number } | { error: string };
 
 export type DeleteLessonResult = { ok: true } | { error: string };
 
+export type AttemptMode = "learn" | "quiz" | "test" | "weak";
+export type AttemptDirection = "es-de" | "de-es";
+
+export type AttemptItem = {
+  vocab_id: string;
+  correct: boolean;
+  direction: AttemptDirection;
+};
+
+export type RecordAttemptInput = {
+  lessonId: string;
+  mode: AttemptMode;
+  total: number;
+  correct: number;
+  grade: number | null;
+  items: AttemptItem[];
+};
+
+export type RecordAttemptResult = { ok: true } | { error: string };
+
 type PairInput = { source: string; target: string };
 
 export async function createLesson(
@@ -267,6 +287,119 @@ export async function updateVocabularyReview(
   }
 
   return { box: updated.box as number };
+}
+
+export async function recordQuizAnswer(
+  vocabId: string,
+  correct: boolean,
+): Promise<UpdateVocabResult> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Nicht eingeloggt." };
+
+  const admin = createAdminClient();
+
+  const { data: vocab, error: fetchError } = await admin
+    .from("vocabulary")
+    .select("id, lesson_id, box, correct_count, wrong_count")
+    .eq("id", vocabId)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("recordQuizAnswer: fetch failed", fetchError);
+    return { error: fetchError.message };
+  }
+  if (!vocab) {
+    return { error: "Vokabel nicht gefunden." };
+  }
+
+  const { data: lesson, error: ownerError } = await admin
+    .from("lessons")
+    .select("user_id")
+    .eq("id", vocab.lesson_id as string)
+    .maybeSingle();
+
+  if (ownerError || !lesson || lesson.user_id !== user.id) {
+    return { error: "Keine Berechtigung." };
+  }
+
+  const currentBox = vocab.box as number;
+  const currentCorrect = vocab.correct_count as number;
+  const currentWrong = vocab.wrong_count as number;
+
+  const newBox = correct
+    ? Math.min(currentBox + 1, 5)
+    : Math.max(currentBox - 1, 1);
+  const newCorrect = correct ? currentCorrect + 1 : currentCorrect;
+  const newWrong = correct ? currentWrong : currentWrong + 1;
+
+  const { data: updated, error: updateError } = await admin
+    .from("vocabulary")
+    .update({
+      box: newBox,
+      correct_count: newCorrect,
+      wrong_count: newWrong,
+      last_review: new Date().toISOString(),
+    })
+    .eq("id", vocabId)
+    .select("box")
+    .single();
+
+  if (updateError || !updated) {
+    console.error("recordQuizAnswer: update failed", updateError);
+    return {
+      error: updateError?.message ?? "Update fehlgeschlagen.",
+    };
+  }
+
+  return { box: updated.box as number };
+}
+
+export async function recordAttempt(
+  input: RecordAttemptInput,
+): Promise<RecordAttemptResult> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Nicht eingeloggt." };
+
+  const admin = createAdminClient();
+
+  const { data: lesson, error: ownerError } = await admin
+    .from("lessons")
+    .select("user_id")
+    .eq("id", input.lessonId)
+    .maybeSingle();
+
+  if (ownerError) {
+    console.error("recordAttempt: ownership query failed", ownerError);
+    return { error: ownerError.message };
+  }
+  if (!lesson || lesson.user_id !== user.id) {
+    return { error: "Keine Berechtigung." };
+  }
+
+  const { error: insertError } = await admin.from("attempts").insert({
+    user_id: user.id,
+    lesson_id: input.lessonId,
+    mode: input.mode,
+    total: input.total,
+    correct: input.correct,
+    grade: input.grade,
+    items: input.items,
+  });
+
+  if (insertError) {
+    console.error("recordAttempt: insert failed", insertError);
+    return { error: insertError.message };
+  }
+
+  return { ok: true };
 }
 
 export async function deleteLesson(id: string): Promise<DeleteLessonResult> {

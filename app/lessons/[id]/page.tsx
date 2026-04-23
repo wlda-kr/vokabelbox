@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
   Brain,
+  ChevronDown,
   ClipboardCheck,
   Target,
 } from "lucide-react";
@@ -36,6 +37,46 @@ const BOX_FG: Record<number, string> = {
   5: "text-paper",
 };
 
+function HelpDetails() {
+  return (
+    <details className="group card-flat">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-bold">
+        <span>Wie funktioniert das?</span>
+        <ChevronDown
+          aria-hidden
+          size={18}
+          className="transition-transform duration-200 group-open:rotate-180"
+        />
+      </summary>
+      <div className="mt-4 space-y-3 text-sm text-navy">
+        <p>
+          Jede Vokabel sitzt in einer von 5 Boxen. Box 1 bedeutet neu oder
+          noch wackelig, Box 5 heißt: sitzt sicher.
+        </p>
+        <p>
+          Richtige Antworten schicken die Vokabel eine Box höher, falsche
+          eine zurück. Im Lernmodus entscheidest du selbst — „Nochmal üben"
+          schickt sie sofort auf Box 1 zurück.
+        </p>
+        <ul className="space-y-1 pl-4 list-disc marker:text-tomato">
+          <li>
+            <span className="font-bold">Lernen:</span> Karteikarten zum
+            Durchblättern, Selbst-Check.
+          </li>
+          <li>
+            <span className="font-bold">Abfrage:</span> alle Vokabeln mit
+            Tippeingabe, Richtung gemischt.
+          </li>
+          <li>
+            <span className="font-bold">Test:</span> 30 zufällige Vokabeln
+            mit Benotung am Ende.
+          </li>
+        </ul>
+      </div>
+    </details>
+  );
+}
+
 function BoxBadge({ box }: { box: number }) {
   const bg = BOX_BG[box] ?? "bg-paper";
   const fg = BOX_FG[box] ?? "text-navy";
@@ -55,18 +96,25 @@ type ModeVariant = {
   iconBg: string;
 };
 
-const MODE_ACTIVE: ModeVariant = {
+const MODE_LEARN: ModeVariant = {
   wrapper:
     "bg-tomato text-paper shadow-pop hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop-lg",
   iconBg: "bg-paper text-tomato",
 };
 
-const MODE_DISABLED_TEAL: ModeVariant = {
-  wrapper: "bg-teal/40 text-navy/60 cursor-not-allowed",
-  iconBg: "bg-paper/60 text-navy/50",
+const MODE_QUIZ: ModeVariant = {
+  wrapper:
+    "bg-teal text-paper shadow-pop hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop-lg",
+  iconBg: "bg-paper text-teal-dark",
 };
 
-const MODE_DISABLED_SUNSHINE: ModeVariant = {
+const MODE_TEST: ModeVariant = {
+  wrapper:
+    "bg-sunshine text-navy shadow-pop hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop-lg",
+  iconBg: "bg-paper text-navy",
+};
+
+const MODE_TEST_DISABLED: ModeVariant = {
   wrapper: "bg-sunshine/40 text-navy/60 cursor-not-allowed",
   iconBg: "bg-paper/60 text-navy/50",
 };
@@ -158,26 +206,39 @@ export default async function LessonPage({
         </p>
       </div>
 
+      <HelpDetails />
+
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ModeCard
           title="Lernen"
-          subtitle="Karteikarten durchgehen"
+          subtitle="Karteikarten mit Selbst-Check"
           icon={<Brain size={24} />}
-          variant={MODE_ACTIVE}
+          variant={MODE_LEARN}
           href={`/lessons/${lesson.id}/learn`}
         />
         <ModeCard
           title="Abfrage"
-          subtitle="Bald verfügbar"
+          subtitle="Alle Vokabeln, Tippeingabe"
           icon={<Target size={24} />}
-          variant={MODE_DISABLED_TEAL}
+          variant={MODE_QUIZ}
+          href={`/lessons/${lesson.id}/quiz`}
         />
-        <ModeCard
-          title="Test"
-          subtitle="Bald verfügbar"
-          icon={<ClipboardCheck size={24} />}
-          variant={MODE_DISABLED_SUNSHINE}
-        />
+        {count >= 5 ? (
+          <ModeCard
+            title="Test"
+            subtitle="30 Vokabeln mit Note"
+            icon={<ClipboardCheck size={24} />}
+            variant={MODE_TEST}
+            href={`/lessons/${lesson.id}/test`}
+          />
+        ) : (
+          <ModeCard
+            title="Test"
+            subtitle="Mind. 5 Vokabeln nötig"
+            icon={<ClipboardCheck size={24} />}
+            variant={MODE_TEST_DISABLED}
+          />
+        )}
       </section>
 
       {count === 0 ? (
