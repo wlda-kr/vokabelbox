@@ -27,6 +27,17 @@ Ein minimaler Vokabeltrainer für ein Kind (12 J.), das Spanisch lernt. PWA, opt
 - Server-Actions und API-Routen validieren Eingaben mit Zod bei nicht-trivialem Input.
 - Fehler sichtbar machen, nicht schlucken. User bekommt eine verständliche Fehlermeldung.
 
+## Git Workflow
+
+Am Ende jeder abgeschlossenen Arbeitseinheit (Feature, Fix, Refactor):
+
+1. Git-Commit mit aussagekräftiger Message nach Conventional Commits
+   (`feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, etc.)
+2. Git-Push auf `origin/main`
+3. Falls Worktree: zuerst in `main` mergen, dann pushen
+
+Nicht auf explizite Aufforderung warten. Das ist der Default-Workflow.
+
 ## Projektstruktur
 
 ```
