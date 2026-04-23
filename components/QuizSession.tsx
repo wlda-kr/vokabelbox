@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, RotateCcw, X as XIcon } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  RotateCcw,
+  X as XIcon,
+} from "lucide-react";
 import { SpeakButton } from "@/components/SpeakButton";
 import {
   recordAttempt,
@@ -10,7 +16,7 @@ import {
   type Lesson,
   type VocabularyItem,
 } from "@/lib/actions/lessons";
-import { isAnswerCorrect } from "@/lib/answer-matching";
+import { checkAnswer, type AnswerResult } from "@/lib/answer-matching";
 import { calculateGrade } from "@/lib/grading";
 
 type Direction = "es-de" | "de-es";
@@ -24,7 +30,7 @@ type QueueItem = {
 };
 
 type CurrentResult = {
-  correct: boolean;
+  kind: AnswerResult;
   expected: string;
   userAnswer: string;
 };
@@ -32,7 +38,7 @@ type CurrentResult = {
 type AnswerLog = {
   vocab_id: string;
   direction: Direction;
-  correct: boolean;
+  result: AnswerResult;
   question: string;
   expected: string;
   user_answer: string;
@@ -59,7 +65,9 @@ function buildQueue(
 ): QueueItem[] {
   const shuffled = shuffle(vocabulary);
   const capped =
-    mode === "test" ? shuffled.slice(0, Math.min(TEST_CAP, shuffled.length)) : shuffled;
+    mode === "test"
+      ? shuffled.slice(0, Math.min(TEST_CAP, shuffled.length))
+      : shuffled;
   return capped.map((vocab): QueueItem => ({
     vocab,
     direction: Math.random() < 0.5 ? "es-de" : "de-es",
@@ -134,8 +142,10 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
   const position = done ? total : currentIndex + 1;
   const progressPct = Math.round(((done ? total : currentIndex) / total) * 100);
 
-  const correctCount = results.filter((r) => r.correct).length;
-  const wrongLogs = results.filter((r) => !r.correct);
+  const correctCount = results.filter(
+    (r) => r.result === "correct" || r.result === "almost",
+  ).length;
+  const wrongLogs = results.filter((r) => r.result === "wrong");
   const wrongCount = wrongLogs.length;
 
   async function handleSubmit(event?: React.FormEvent) {
@@ -145,19 +155,19 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
     if (!trimmed) return;
 
     setSubmitting(true);
-    const correct = isAnswerCorrect(trimmed, expected);
+    const kind = checkAnswer(trimmed, expected);
     const log: AnswerLog = {
       vocab_id: current.vocab.id,
       direction: current.direction,
-      correct,
+      result: kind,
       question,
       expected,
       user_answer: trimmed,
     };
-    setResult({ correct, expected, userAnswer: trimmed });
+    setResult({ kind, expected, userAnswer: trimmed });
     setResults((prev) => [...prev, log]);
 
-    const res = await recordQuizAnswer(current.vocab.id, correct);
+    const res = await recordQuizAnswer(current.vocab.id, kind);
     if ("error" in res) {
       console.error("recordQuizAnswer failed", res.error);
     }
@@ -172,7 +182,9 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
       setDone(true);
       if (!attemptSavedRef.current) {
         attemptSavedRef.current = true;
-        const finalCorrect = results.filter((r) => r.correct).length;
+        const finalCorrect = results.filter(
+          (r) => r.result === "correct" || r.result === "almost",
+        ).length;
         const percent = total > 0 ? (finalCorrect / total) * 100 : 0;
         const grade = mode === "test" ? calculateGrade(percent).grade : null;
         const saveResult = await recordAttempt({
@@ -183,7 +195,7 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
           grade,
           items: results.map((r) => ({
             vocab_id: r.vocab_id,
-            correct: r.correct,
+            result: r.result,
             direction: r.direction,
           })),
         });
@@ -315,13 +327,13 @@ export function QuizSession({ lesson, vocabulary, mode }: Props) {
 }
 
 function ResultBox({ result }: { result: CurrentResult }) {
-  if (result.correct) {
+  if (result.kind === "correct") {
     return (
       <div
         role="status"
-        className="flex items-center gap-2 rounded-lg border-2 border-teal bg-teal/15 p-3 text-sm font-medium text-teal-dark"
+        className="flex items-start gap-2 rounded-lg border-2 border-box-4 bg-box-4/15 p-3 text-sm font-medium text-teal-dark"
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal text-paper">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-box-4 text-paper">
           <Check size={14} />
         </span>
         <div>
@@ -333,6 +345,28 @@ function ResultBox({ result }: { result: CurrentResult }) {
       </div>
     );
   }
+
+  if (result.kind === "almost") {
+    return (
+      <div
+        role="status"
+        className="flex items-start gap-2 rounded-lg border-2 border-sunshine bg-sunshine/30 p-3 text-sm font-medium text-navy"
+      >
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sunshine text-navy border-2 border-navy">
+          <AlertCircle size={12} />
+        </span>
+        <div className="space-y-1">
+          <p className="font-bold">Fast richtig</p>
+          <p className="text-xs">Achte auf die Schreibweise.</p>
+          <p className="text-xs">Deine Antwort: „{result.userAnswer}"</p>
+          <p className="text-xs">
+            Erwartet: <span className="font-bold">„{result.expected}"</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       role="alert"

@@ -2,43 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, RotateCcw, Trophy } from "lucide-react";
 import { SpeakButton } from "@/components/SpeakButton";
 import {
   updateVocabularyReview,
-  type VocabularyItem,
+  type DueVocabularyItem,
 } from "@/lib/actions/lessons";
 
-function shuffle<T>(input: readonly T[]): T[] {
-  const arr = input.slice();
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 type Props = {
-  lessonId: string;
-  vocabulary: VocabularyItem[];
-  scope?: "weak" | "new" | "all";
-  notice?: string | null;
+  vocabulary: DueVocabularyItem[];
 };
 
-const SCOPE_LABELS: Record<"weak" | "new" | "all", string> = {
-  weak: "Schwache Wörter",
-  new: "Neue Wörter",
-  all: "Alle Wörter",
-};
-
-export function LearnSession({
-  lessonId,
-  vocabulary,
-  scope = "all",
-  notice = null,
-}: Props) {
+export function TodaySession({ vocabulary }: Props) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [queue, setQueue] = useState<VocabularyItem[]>([]);
+  const [queue, setQueue] = useState<DueVocabularyItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [results, setResults] = useState({ known: 0, unknown: 0 });
@@ -47,7 +26,8 @@ export function LearnSession({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setQueue(shuffle(vocabulary));
+    // Queue kommt bereits serverseitig priorisiert + geshuffled.
+    setQueue(vocabulary);
     setMounted(true);
   }, [vocabulary]);
 
@@ -60,18 +40,9 @@ export function LearnSession({
   if (!mounted || queue.length === 0) {
     return (
       <main className="mx-auto w-full max-w-2xl p-6">
-        <p className="text-sm text-ink-soft">Lade Lernkarten…</p>
+        <p className="text-sm text-ink-soft">Lade Heute-Liste…</p>
       </main>
     );
-  }
-
-  function restart() {
-    setQueue(shuffle(vocabulary));
-    setCurrentIndex(0);
-    setFlipped(false);
-    setResults({ known: 0, unknown: 0 });
-    setDone(false);
-    setError(null);
   }
 
   async function handleAnswer(known: boolean) {
@@ -85,7 +56,6 @@ export function LearnSession({
 
     if ("error" in res) {
       setError(res.error);
-      // Fortschritt nicht blockieren.
     }
 
     setResults((prev) => ({
@@ -110,23 +80,14 @@ export function LearnSession({
   return (
     <main className="mx-auto w-full max-w-2xl p-6 space-y-6">
       <header className="flex items-center justify-between gap-3">
-        <Link
-          href={`/lessons/${lessonId}`}
-          className="btn-ghost text-sm -ml-3"
-        >
+        <Link href="/" className="btn-ghost text-sm -ml-3">
           <ArrowLeft size={16} />
           Abbrechen
         </Link>
         <span className="text-sm font-bold tabular-nums">
-          {SCOPE_LABELS[scope]} · {position} / {total}
+          Heute · {position} / {total}
         </span>
       </header>
-
-      {notice && (
-        <div className="rounded-lg border-2 border-navy bg-sunshine/40 px-3 py-2 text-sm font-medium">
-          {notice}
-        </div>
-      )}
 
       <div
         className="h-4 w-full overflow-hidden rounded-full border-2 border-navy bg-paper"
@@ -151,8 +112,10 @@ export function LearnSession({
         <DoneCard
           known={results.known}
           unknown={results.unknown}
-          lessonId={lessonId}
-          onRestart={restart}
+          onFinish={() => {
+            router.push("/");
+            router.refresh();
+          }}
         />
       ) : currentItem ? (
         <>
@@ -195,7 +158,7 @@ function FlipCard({
   flipped,
   onFlip,
 }: {
-  item: VocabularyItem;
+  item: DueVocabularyItem;
   flipped: boolean;
   onFlip: () => void;
 }) {
@@ -215,6 +178,9 @@ function FlipCard({
       >
         <div className="flip-card-face flip-card-front">
           <div className="relative flex h-full min-h-[340px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-navy bg-paper p-6 text-center shadow-pop-lg">
+            <p className="absolute top-4 left-1/2 -translate-x-1/2 text-xs font-bold uppercase tracking-wide text-ink-soft max-w-[80%] truncate">
+              aus: {item.lesson_name}
+            </p>
             <p className="font-display text-4xl md:text-5xl font-bold leading-tight text-navy">
               {item.term_source}
             </p>
@@ -244,13 +210,11 @@ function FlipCard({
 function DoneCard({
   known,
   unknown,
-  lessonId,
-  onRestart,
+  onFinish,
 }: {
   known: number;
   unknown: number;
-  lessonId: string;
-  onRestart: () => void;
+  onFinish: () => void;
 }) {
   return (
     <section className="card bg-sunshine text-center space-y-6 py-10">
@@ -260,8 +224,8 @@ function DoneCard({
         </div>
       </div>
       <div className="space-y-1">
-        <h2 className="font-display text-4xl font-bold">¡Muy bien!</h2>
-        <p className="text-sm text-ink-soft">Alles durchgegangen.</p>
+        <h2 className="font-display text-4xl font-bold">¡Perfecto!</h2>
+        <p className="text-sm text-ink-soft">Heute ist erledigt.</p>
       </div>
       <div className="flex items-center justify-center gap-6">
         <div className="space-y-1">
@@ -282,15 +246,9 @@ function DoneCard({
           </p>
         </div>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <button type="button" onClick={onRestart} className="btn-primary">
-          <RotateCcw size={16} aria-hidden />
-          Nochmal
-        </button>
-        <Link href={`/lessons/${lessonId}`} className="btn-ghost bg-paper">
-          Zurück zur Lektion
-        </Link>
-      </div>
+      <button type="button" onClick={onFinish} className="btn-primary">
+        Fertig
+      </button>
     </section>
   );
 }

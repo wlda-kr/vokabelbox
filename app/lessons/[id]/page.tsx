@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
+  Book,
   Brain,
   ChevronDown,
   ClipboardCheck,
+  Flame,
+  Sparkles,
   Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -49,29 +52,48 @@ function HelpDetails() {
         />
       </summary>
       <div className="mt-4 space-y-3 text-sm text-navy">
-        <p>
-          Jede Vokabel sitzt in einer von 5 Boxen. Box 1 bedeutet neu oder
-          noch wackelig, Box 5 heißt: sitzt sicher.
-        </p>
-        <p>
-          Richtige Antworten schicken die Vokabel eine Box höher, falsche
-          eine zurück. Im Lernmodus entscheidest du selbst — „Nochmal üben"
-          schickt sie sofort auf Box 1 zurück.
-        </p>
-        <ul className="space-y-1 pl-4 list-disc marker:text-tomato">
-          <li>
-            <span className="font-bold">Lernen:</span> Karteikarten zum
-            Durchblättern, Selbst-Check.
+        <p>Jede Vokabel lebt in einer der 5 Boxen:</p>
+        <ul className="space-y-1 pl-1">
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-navy bg-box-1 text-xs font-bold text-paper">
+              1
+            </span>
+            <span>Neu oder noch unsicher – täglich üben</span>
           </li>
-          <li>
-            <span className="font-bold">Abfrage:</span> alle Vokabeln mit
-            Tippeingabe, Richtung gemischt.
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-navy bg-box-2 text-xs font-bold text-navy">
+              2
+            </span>
+            <span>Einmal richtig – alle 2 Tage</span>
           </li>
-          <li>
-            <span className="font-bold">Test:</span> 30 zufällige Vokabeln
-            mit Benotung am Ende.
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-navy bg-box-3 text-xs font-bold text-navy">
+              3
+            </span>
+            <span>Zweimal richtig – alle 4 Tage</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-navy bg-box-4 text-xs font-bold text-paper">
+              4
+            </span>
+            <span>Sitzt fast – alle 7 Tage</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-navy bg-box-5 text-xs font-bold text-paper">
+              5
+            </span>
+            <span>Gemeistert – alle 2 Wochen</span>
           </li>
         </ul>
+        <p>
+          Richtige Antworten schicken Vokabeln eine Box höher, falsche eine
+          zurück. Bei „Fast richtig" (nur Schreibfehler) bleibt die Box
+          gleich.
+        </p>
+        <p>
+          Die Seite <span className="font-bold">Heute</span> zeigt dir, was
+          gerade fällig ist – das ist dein tägliches Lern-Ziel.
+        </p>
       </div>
     </details>
   );
@@ -94,12 +116,6 @@ function BoxBadge({ box }: { box: number }) {
 type ModeVariant = {
   wrapper: string;
   iconBg: string;
-};
-
-const MODE_LEARN: ModeVariant = {
-  wrapper:
-    "bg-tomato text-paper shadow-pop hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop-lg",
-  iconBg: "bg-paper text-tomato",
 };
 
 const MODE_QUIZ: ModeVariant = {
@@ -157,6 +173,60 @@ function ModeCard({
   return <div className={`${base} ${variant.wrapper}`}>{content}</div>;
 }
 
+type LearnScope = {
+  title: string;
+  subtitle: string;
+  count: number;
+  href: string;
+  icon: React.ReactNode;
+  emphasized: boolean;
+};
+
+function LearnCard({ lessonId, scopes }: { lessonId: string; scopes: LearnScope[] }) {
+  return (
+    <details className="group relative rounded-xl border-2 border-navy bg-tomato text-paper shadow-pop transition-all sm:col-span-1">
+      <summary className="flex min-h-[140px] cursor-pointer list-none flex-col items-center justify-center gap-2 px-4 py-5 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-navy bg-paper text-tomato">
+          <Brain size={24} />
+        </span>
+        <span className="font-display text-xl font-bold">Lernen</span>
+        <span className="flex items-center gap-1 text-xs font-medium">
+          Box-Filter wählen
+          <ChevronDown
+            aria-hidden
+            size={14}
+            className="transition-transform duration-200 group-open:rotate-180"
+          />
+        </span>
+      </summary>
+      <div className="space-y-2 border-t-2 border-navy/20 bg-paper p-3 text-navy rounded-b-xl">
+        {scopes.map((scope) => (
+          <Link
+            key={scope.href}
+            href={`/lessons/${lessonId}/learn${scope.href}`}
+            className={`flex items-center justify-between gap-3 rounded-lg border-2 border-navy px-3 py-2 text-sm transition-colors ${
+              scope.emphasized
+                ? "bg-tomato text-paper"
+                : "bg-paper hover:bg-cream"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                {scope.icon}
+              </span>
+              <span>
+                <span className="font-bold block">{scope.title}</span>
+                <span className="text-xs opacity-80">{scope.subtitle}</span>
+              </span>
+            </span>
+            <span className="text-sm font-bold tabular-nums">{scope.count}</span>
+          </Link>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 export default async function LessonPage({
   params,
 }: {
@@ -190,6 +260,45 @@ export default async function LessonPage({
   const { lesson, vocabulary } = result;
   const count = vocabulary.length;
 
+  const weakCount = vocabulary.filter((v) => v.box <= 2).length;
+  const newCount = vocabulary.filter(
+    (v) => v.box === 1 && v.correct_count + v.wrong_count === 0,
+  ).length;
+
+  // Wenn weak-Pool leer ist, schicken wir den Schwach-Button auf "all" mit
+  // einer freundlichen Notiz, dass alles sitzt.
+  const weakHref =
+    weakCount > 0 ? "?scope=weak" : "?scope=all&reason=all_mastered";
+  const newHref =
+    newCount > 0 ? "?scope=new" : "?scope=all&reason=nothing_new";
+
+  const scopes: LearnScope[] = [
+    {
+      title: "Schwache Wörter",
+      subtitle: weakCount > 0 ? "Box 1-2" : "alle sitzen — auffrischen",
+      count: weakCount > 0 ? weakCount : count,
+      href: weakHref,
+      icon: <Flame size={16} />,
+      emphasized: true,
+    },
+    {
+      title: "Neue Wörter",
+      subtitle: newCount > 0 ? "noch nie geübt" : "alle schon angefangen",
+      count: newCount > 0 ? newCount : count,
+      href: newHref,
+      icon: <Sparkles size={16} />,
+      emphasized: false,
+    },
+    {
+      title: "Alle Wörter",
+      subtitle: "komplette Liste",
+      count,
+      href: "?scope=all",
+      icon: <Book size={16} />,
+      emphasized: false,
+    },
+  ];
+
   return (
     <main className="mx-auto w-full max-w-3xl p-6 space-y-8">
       <div className="space-y-3">
@@ -209,20 +318,32 @@ export default async function LessonPage({
       <HelpDetails />
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <ModeCard
-          title="Lernen"
-          subtitle="Karteikarten mit Selbst-Check"
-          icon={<Brain size={24} />}
-          variant={MODE_LEARN}
-          href={`/lessons/${lesson.id}/learn`}
-        />
-        <ModeCard
-          title="Abfrage"
-          subtitle="Alle Vokabeln, Tippeingabe"
-          icon={<Target size={24} />}
-          variant={MODE_QUIZ}
-          href={`/lessons/${lesson.id}/quiz`}
-        />
+        {count === 0 ? (
+          <ModeCard
+            title="Lernen"
+            subtitle="Keine Vokabeln"
+            icon={<Brain size={24} />}
+            variant={MODE_TEST_DISABLED}
+          />
+        ) : (
+          <LearnCard lessonId={lesson.id} scopes={scopes} />
+        )}
+        {count === 0 ? (
+          <ModeCard
+            title="Abfrage"
+            subtitle="Keine Vokabeln"
+            icon={<Target size={24} />}
+            variant={MODE_TEST_DISABLED}
+          />
+        ) : (
+          <ModeCard
+            title="Abfrage"
+            subtitle="Alle Vokabeln, Tippeingabe"
+            icon={<Target size={24} />}
+            variant={MODE_QUIZ}
+            href={`/lessons/${lesson.id}/quiz`}
+          />
+        )}
         {count >= 5 ? (
           <ModeCard
             title="Test"

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/auth/LogoutButton";
-import { listLessons } from "@/lib/actions/lessons";
+import { getDueCount, listLessons } from "@/lib/actions/lessons";
 
 function formatRelativeDate(iso: string): string {
   const then = new Date(iso).getTime();
@@ -99,6 +99,53 @@ function EmptyState() {
   );
 }
 
+function TodayHero({
+  total,
+  lessonCount,
+}: {
+  total: number;
+  lessonCount: number;
+}) {
+  return (
+    <section className="rounded-xl border-2 border-navy bg-sunshine p-6 shadow-pop-lg space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-4xl font-bold -rotate-1 leading-tight">
+            Heute
+          </h2>
+          <p className="mt-2 text-base text-navy">
+            Du hast <span className="font-bold">{total}</span>{" "}
+            {total === 1 ? "Vokabel" : "Vokabeln"} zu wiederholen
+            {lessonCount > 0 && (
+              <>
+                {" "}
+                aus <span className="font-bold">{lessonCount}</span>{" "}
+                {lessonCount === 1 ? "Lektion" : "Lektionen"}
+              </>
+            )}
+            .
+          </p>
+        </div>
+        <Sparkles aria-hidden size={28} className="shrink-0 text-navy" />
+      </div>
+      <Link href="/today" className="btn-primary w-full text-lg py-4">
+        Jetzt starten
+      </Link>
+    </section>
+  );
+}
+
+function TodayQuiet() {
+  return (
+    <section className="card-flat text-center space-y-1">
+      <p className="font-bold">Heute ist nichts fällig.</p>
+      <p className="text-sm text-ink-soft">
+        Schau später wieder rein oder lege eine neue Lektion an.
+      </p>
+    </section>
+  );
+}
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -109,7 +156,10 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const lessons = await listLessons();
+  const [lessons, dueStats] = await Promise.all([
+    listLessons(),
+    getDueCount(),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-3xl p-6 space-y-8">
@@ -125,10 +175,20 @@ export default async function Home() {
         </div>
       </header>
 
+      {lessons.length > 0 &&
+        (dueStats.total > 0 ? (
+          <TodayHero
+            total={dueStats.total}
+            lessonCount={dueStats.lessonCount}
+          />
+        ) : (
+          <TodayQuiet />
+        ))}
+
       {lessons.length > 0 && (
         <Link
           href="/lessons/new"
-          className="btn-primary w-full text-lg py-4"
+          className="btn-secondary w-full text-lg py-4"
         >
           <Plus size={20} />
           Neue Lektion

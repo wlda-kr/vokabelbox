@@ -57,6 +57,12 @@
     background: var(--color-sunshine);
     color: var(--color-navy);
   }
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
 }
 
 @layer components {

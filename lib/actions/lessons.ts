@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isDue } from "@/lib/leitner";
+import type { AnswerResult } from "@/lib/answer-matching";
 
 export type LessonSummary = {
   id: string;
@@ -46,7 +48,7 @@ export type AttemptDirection = "es-de" | "de-es";
 
 export type AttemptItem = {
   vocab_id: string;
-  correct: boolean;
+  result: AnswerResult;
   direction: AttemptDirection;
 };
 
@@ -60,6 +62,10 @@ export type RecordAttemptInput = {
 };
 
 export type RecordAttemptResult = { ok: true } | { error: string };
+
+export type DueVocabularyItem = VocabularyItem & { lesson_name: string };
+
+export type DueCount = { total: number; lessonCount: number };
 
 type PairInput = { source: string; target: string };
 
@@ -291,7 +297,7 @@ export async function updateVocabularyReview(
 
 export async function recordQuizAnswer(
   vocabId: string,
-  correct: boolean,
+  result: AnswerResult,
 ): Promise<UpdateVocabResult> {
   const supabase = await createServerSupabaseClient();
   const {
@@ -330,11 +336,18 @@ export async function recordQuizAnswer(
   const currentCorrect = vocab.correct_count as number;
   const currentWrong = vocab.wrong_count as number;
 
-  const newBox = correct
-    ? Math.min(currentBox + 1, 5)
-    : Math.max(currentBox - 1, 1);
-  const newCorrect = correct ? currentCorrect + 1 : currentCorrect;
-  const newWrong = correct ? currentWrong : currentWrong + 1;
+  let newBox = currentBox;
+  let newCorrect = currentCorrect;
+  let newWrong = currentWrong;
+
+  if (result === "correct") {
+    newBox = Math.min(currentBox + 1, 5);
+    newCorrect = currentCorrect + 1;
+  } else if (result === "wrong") {
+    newBox = Math.max(currentBox - 1, 1);
+    newWrong = currentWrong + 1;
+  }
+  // "almost": Box bleibt, keine Zähler.
 
   const { data: updated, error: updateError } = await admin
     .from("vocabulary")
@@ -370,20 +383,6 @@ export async function recordAttempt(
 
   const admin = createAdminClient();
 
-  const { data: lesson, error: ownerError } = await admin
-    .from("lessons")
-    .select("user_id")
-    .eq("id", input.lessonId)
-    .maybeSingle();
-
-  if (ownerError) {
-    console.error("recordAttempt: ownership query failed", ownerError);
-    return { error: ownerError.message };
-  }
-  if (!lesson || lesson.user_id !== user.id) {
-    return { error: "Keine Berechtigung." };
-  }
-
   const { error: insertError } = await admin.from("attempts").insert({
     user_id: user.id,
     lesson_id: input.lessonId,
@@ -400,6 +399,91 @@ export async function recordAttempt(
   }
 
   return { ok: true };
+}
+
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+export async function getDueVocabulary(
+  limit = 30,
+): Promise<DueVocabularyItem[]> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("vocabulary")
+    .select(
+      "id, lesson_id, term_source, term_target, box, correct_count, wrong_count, position, last_review, lessons!inner(name, user_id)",
+    )
+    .eq("lessons.user_id", user.id);
+
+  if (error || !data) {
+    if (error) console.error("getDueVocabulary failed", error);
+    return [];
+  }
+
+  const all: DueVocabularyItem[] = data.map((row) => {
+    const lesson = row.lessons as unknown as { name: string };
+    return {
+      id: row.id as string,
+      lesson_id: row.lesson_id as string,
+      term_source: row.term_source as string,
+      term_target: row.term_target as string,
+      box: row.box as number,
+      correct_count: row.correct_count as number,
+      wrong_count: row.wrong_count as number,
+      position: row.position as number,
+      last_review: row.last_review as string | null,
+      lesson_name: lesson?.name ?? "",
+    };
+  });
+
+  const due = all.filter((v) => isDue(v.box, v.last_review));
+
+  const highPriority = due.filter((v) => v.box <= 2);
+  const lowPriority = due.filter((v) => v.box > 2);
+  shuffleInPlace(highPriority);
+  shuffleInPlace(lowPriority);
+
+  return [...highPriority, ...lowPriority].slice(0, limit);
+}
+
+export async function getDueCount(): Promise<DueCount> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { total: 0, lessonCount: 0 };
+
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("vocabulary")
+    .select("lesson_id, box, last_review, lessons!inner(user_id)")
+    .eq("lessons.user_id", user.id);
+
+  if (error || !data) {
+    if (error) console.error("getDueCount failed", error);
+    return { total: 0, lessonCount: 0 };
+  }
+
+  const due = data.filter((row) =>
+    isDue(row.box as number, row.last_review as string | null),
+  );
+  const lessonIds = new Set(due.map((row) => row.lesson_id as string));
+  return { total: due.length, lessonCount: lessonIds.size };
 }
 
 export async function deleteLesson(id: string): Promise<DeleteLessonResult> {
