@@ -110,7 +110,7 @@ export default function LoginPage() {
 
   async function handleVerifySubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (code.length !== 6) return;
+    if (code.length !== 8) return;
 
     setLoading(true);
     setError(null);
@@ -158,7 +158,7 @@ export default function LoginPage() {
   }
 
   function handleCodeChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const cleaned = event.target.value.replace(/\D/g, "").slice(0, 6);
+    const cleaned = event.target.value.replace(/\D/g, "").slice(0, 8);
     setCode(cleaned);
   }
 
@@ -221,7 +221,7 @@ export default function LoginPage() {
           >
             <div className="space-y-2">
               <p className="text-sm">
-                Wir haben dir einen 6-stelligen Code an{" "}
+                Wir haben dir einen 8-stelligen Code an{" "}
                 <span className="font-bold break-all">{email}</span>{" "}
                 geschickt.
               </p>
@@ -237,14 +237,14 @@ export default function LoginPage() {
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={6}
+                maxLength={8}
                 autoComplete="one-time-code"
                 autoCorrect="off"
                 spellCheck={false}
                 value={code}
                 onChange={handleCodeChange}
-                placeholder="123456"
-                className="input-bold text-center text-3xl font-bold tracking-[0.4em] tabular-nums"
+                placeholder="12345678"
+                className="input-bold text-center text-2xl font-bold tracking-[0.3em] tabular-nums sm:text-3xl"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               />
             </div>
@@ -269,7 +269,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || code.length !== 6}
+              disabled={loading || code.length !== 8}
               className="btn-primary w-full"
             >
               {loading ? "Prüfe…" : "Anmelden"}
