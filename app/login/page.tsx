@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+
+type Phase = "request_code" | "verify_code";
 
 function HeaderDecoration() {
   return (
@@ -53,39 +56,110 @@ function HeaderDecoration() {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [phase, setPhase] = useState<Phase>("request_code");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [resentNotice, setResentNotice] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("error") === "auth_failed") {
-      setError("Anmeldung fehlgeschlagen. Bitte fordere einen neuen Link an.");
+      setError("Anmeldung fehlgeschlagen. Fordere einen neuen Code an.");
     }
   }, []);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (phase !== "verify_code") return;
+    const raf = requestAnimationFrame(() => codeInputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  async function requestCode(targetEmail: string): Promise<string | null> {
+    const supabase = createClient();
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email: targetEmail,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: undefined,
+      },
+    });
+    return signInError?.message ?? null;
+  }
+
+  async function handleRequestSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setResentNotice(false);
+
+    const message = await requestCode(email);
+    setLoading(false);
+
+    if (message) {
+      setError(message);
+      return;
+    }
+
+    setCode("");
+    setPhase("verify_code");
+  }
+
+  async function handleVerifySubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (code.length !== 6) return;
+
+    setLoading(true);
+    setError(null);
+    setResentNotice(false);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithOtp({
+    const { error: verifyError } = await supabase.auth.verifyOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      token: code,
+      type: "email",
     });
 
     setLoading(false);
 
-    if (signInError) {
-      setError(signInError.message);
+    if (verifyError) {
+      setError("Code falsch oder abgelaufen.");
       return;
     }
 
-    setSent(true);
+    router.push("/");
+    router.refresh();
+  }
+
+  async function handleResend() {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    setResentNotice(false);
+
+    const message = await requestCode(email);
+    setLoading(false);
+
+    if (message) {
+      setError(message);
+      return;
+    }
+    setResentNotice(true);
+  }
+
+  function handleChangeEmail() {
+    setPhase("request_code");
+    setCode("");
+    setError(null);
+    setResentNotice(false);
+  }
+
+  function handleCodeChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const cleaned = event.target.value.replace(/\D/g, "").slice(0, 6);
+    setCode(cleaned);
   }
 
   return (
@@ -100,20 +174,14 @@ export default function LoginPage() {
           Lerne Spanisch, bevor die Prüfung dich lernt.
         </p>
 
-        {sent ? (
-          <div className="card bg-sunshine text-center space-y-2">
-            <p className="font-display text-xl font-bold">
-              Schau in dein Postfach.
-            </p>
-            <p className="text-sm">Der Link ist 15 Minuten gültig.</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="card space-y-5" noValidate>
+        {phase === "request_code" ? (
+          <form
+            onSubmit={handleRequestSubmit}
+            className="card space-y-5"
+            noValidate
+          >
             <div className="space-y-2">
-              <label
-                htmlFor="email"
-                className="block text-sm font-bold"
-              >
+              <label htmlFor="email" className="block text-sm font-bold">
                 E-Mail-Adresse
               </label>
               <input
@@ -142,8 +210,89 @@ export default function LoginPage() {
               disabled={loading || !email}
               className="btn-primary w-full"
             >
-              {loading ? "Wird gesendet…" : "Login-Link senden"}
+              {loading ? "Wird gesendet…" : "Code anfordern"}
             </button>
+          </form>
+        ) : (
+          <form
+            onSubmit={handleVerifySubmit}
+            className="card space-y-5"
+            noValidate
+          >
+            <div className="space-y-2">
+              <p className="text-sm">
+                Wir haben dir einen 6-stelligen Code an{" "}
+                <span className="font-bold break-all">{email}</span>{" "}
+                geschickt.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="code" className="block text-sm font-bold">
+                Code
+              </label>
+              <input
+                ref={codeInputRef}
+                id="code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                autoComplete="one-time-code"
+                autoCorrect="off"
+                spellCheck={false}
+                value={code}
+                onChange={handleCodeChange}
+                placeholder="123456"
+                className="input-bold text-center text-3xl font-bold tracking-[0.4em] tabular-nums"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              />
+            </div>
+
+            {resentNotice && !error && (
+              <div
+                role="status"
+                className="rounded-lg border-2 border-teal bg-teal/15 p-3 text-sm font-medium text-teal-dark"
+              >
+                Neuen Code geschickt. Schau noch mal ins Postfach.
+              </div>
+            )}
+
+            {error && (
+              <div
+                role="alert"
+                className="rounded-lg border-2 border-tomato bg-tomato/10 p-3 text-sm font-medium text-tomato-dark"
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || code.length !== 6}
+              className="btn-primary w-full"
+            >
+              {loading ? "Prüfe…" : "Anmelden"}
+            </button>
+
+            <div className="flex flex-col items-center gap-2 pt-2 text-sm">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={loading}
+                className="font-medium text-teal-dark underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                Code erneut senden
+              </button>
+              <button
+                type="button"
+                onClick={handleChangeEmail}
+                disabled={loading}
+                className="font-medium text-ink-soft underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                Andere E-Mail verwenden
+              </button>
+            </div>
           </form>
         )}
 
